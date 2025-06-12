@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <title>Teste</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+  <link rel="stylesheet" href="observable.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@observablehq/inputs@0.12/dist/index.css">
+</head>
+<body>
+  <div id="vars">
+  </div>
+</body>
+<script type="module">
+
+import {Runtime, Inspector} from "https://unpkg.com/@observablehq/runtime@5/dist/runtime.js";
+import * as Inputs from "https://cdn.jsdelivr.net/npm/@observablehq/inputs@0.12/+esm";
+window.Inputs = Inputs;
+window.Inspector = Inspector;
+
+function that() {
+  return this;
+}
+function observe(initialize) {
+  let stale = false;
+  let value;
+  let resolve;
+  const dispose = initialize(change);
+
+  if (dispose != null && typeof dispose !== "function") {
+    throw new Error(typeof dispose.then === "function"
+        ? "async initializers are not supported"
+        : "initializer returned something, but not a dispose function");
+  }
+
+  function change(x) {
+    if (resolve) resolve(x), resolve = null;
+    else stale = true;
+    return value = x;
+  }
+
+  function next() {
+    return {done: false, value: stale
+        ? (stale = false, Promise.resolve(value))
+        : new Promise(_ => (resolve = _))};
+  }
+
+  return {
+    [Symbol.iterator]: that,
+    throw: () => ({done: true}),
+    return: () => (dispose != null && dispose(), {done: true}),
+    next
+  };
+}
+
+function input(input) {
+  return observe(function(change) {
+    var event = eventof(input), value = valueof(input);
+    function inputted() { change(valueof(input)); }
+    input.addEventListener(event, inputted);
+    if (value !== undefined) change(value);
+    return function() { input.removeEventListener(event, inputted); };
+  });
+}
+
+function valueof(input) {
+  switch (input.type) {
+    case "range":
+    case "number": return input.valueAsNumber;
+    case "date": return input.valueAsDate;
+    case "checkbox": return input.checked;
+    case "file": return input.multiple ? input.files : input.files[0];
+    case "select-multiple": return Array.from(input.selectedOptions, o => o.value);
+    default: return input.value;
+  }
+}
+
+function eventof(input) {
+  switch (input.type) {
+    case "button":
+    case "submit":
+    case "checkbox": return "click";
+    case "file": return "change";
+    default: return "input";
+  }
+}
+
+function varFromText(module, text) {
+  let [_, varName, func] = /\s*(\$\w*)\s*=\s*(\S[\S\s]*)/.exec(text);
+  let mVar;
+  if(func.substr(0,1)=='{') {
+    let m = func.lastIndexOf('}');
+    func = func.substr(1, m-1);
+    let vars = {};
+    func = func.replaceAll(/(\$\w*)/gm, v => { vars[v]=true; return v});
+    vars = Object.keys(vars);
+    let f = Function(...vars, func);
+    let vv = varName.substr(1)
+    let el = $('#vars').append($(`<div id='var_${vv}'></div>`));
+    let  inspe = new Inspector($(`#var_${vv}`)[0]);
+    mVar = module.variable(inspe);
+    mVar.define(varName, vars, f);
+  } else {
+    let inpel = Function(`return Inputs.${func}`)();
+    inpel.label = varName;
+    let el = $('#vars').append($(`<div id='var_${varName.substr(1)}'></div>`)).append(inpel);
+    mVar = module.variable();
+    mVar.define(varName, [], input(inpel));
+  }
+  return mVar;
+}
+
+let runtime = new Runtime();
+const module = runtime.module();
+
+varFromText(module, `$volume = range([0,100],{step:1})`);
+varFromText(module, `$test = { return $volume + 1; } `);
+
+</script>
+</html>
