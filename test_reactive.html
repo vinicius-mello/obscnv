@@ -4,18 +4,43 @@
   <title>Teste</title>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
-  <link rel="stylesheet" href="observable.css">
-  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/@observablehq/inputs@0.12/dist/index.css">
+  <script src="./js/jquery.min.js"></script>
+  <link rel="stylesheet" href="./css/observable.css">
+  <link rel="stylesheet" href="./css/obscnv.css">
+	<script src="./js/ace.js" type="text/javascript" charset="utf-8"></script>
+	<script src="./js/mode-javascript.js" type="text/javascript" charset="utf-8"></script>
 </head>
 <body>
-  <div id="vars">
-  </div>
+	<div id="all" class="split">
+		<div id="left">
+			<div id="vars"> </div>
+		</div>
+		<div id="right" class="split">
+			<div id="canvas"> </div>
+			<div id="editor"> </div>
+			<div id="console"> </div>
+		</div>
+	</div>
 </body>
+<script type="importmap">
+	{
+		"imports": {
+			"isoformat": "./modules/isoformat/index.js",
+			"htl": "./modules/htl/index.js",
+			"runtime": "./modules/runtime/index.js",
+			"inspector": "./modules/inspector/index.js",
+			"inputs": "./modules/inputs/index.js",
+			"split": "./modules/split/split.js"
+		}
+	}
+</script>
 <script type="module">
 
-import {Runtime, Inspector} from "https://unpkg.com/@observablehq/runtime@5/dist/runtime.js";
-import * as Inputs from "https://cdn.jsdelivr.net/npm/@observablehq/inputs@0.12/+esm";
+import {Runtime} from "runtime";
+import {Inspector} from "inspector";
+import * as Inputs from "inputs";
+import Split from 'split';
+
 window.Inputs = Inputs;
 window.Inspector = Inspector;
 
@@ -86,9 +111,9 @@ function eventof(input) {
   }
 }
 
-function varFromText(module, text) {
-  let [_, varName, func] = /\s*(\$\w*)\s*=\s*(\S[\S\s]*)/.exec(text);
+function createVar(module, varName, func) {
   let mVar;
+  let vv = varName.substr(1);
   if(func.substr(0,1)=='{') {
     let m = func.lastIndexOf('}');
     func = func.substr(1, m-1);
@@ -96,26 +121,58 @@ function varFromText(module, text) {
     func = func.replaceAll(/(\$\w*)/gm, v => { vars[v]=true; return v});
     vars = Object.keys(vars);
     let f = Function(...vars, func);
-    let vv = varName.substr(1)
-    let el = $('#vars').append($(`<div id='var_${vv}'></div>`));
-    let  inspe = new Inspector($(`#var_${vv}`)[0]);
+    let el = $('#vars').append($(`<div class='cell' id='var_${vv}'></div>`));
+    $(`#var_${vv}`).append($(`<div id='insp_${vv}'></div>`));
+    let  inspe = new Inspector($(`#insp_${vv}`)[0]);
+    $(`#var_${vv}`).append($('<button>Edit</button>'));
     mVar = module.variable(inspe);
-    mVar.define(varName, vars, f);
+		mVar.define(varName, vars, f);
   } else {
     let inpel = Function(`return Inputs.${func}`)();
     inpel.label = varName;
-    let el = $('#vars').append($(`<div id='var_${varName.substr(1)}'></div>`)).append(inpel);
+    let el = $('#vars').append($(`<div class='cell' id='var_${vv}'></div>`));
+    $(`#var_${vv}`).append($(`<div id='input_${vv}'></div>`)).append(inpel);
+    $(`#var_${vv}`).append($('<button>Edit</button>'));
+
     mVar = module.variable();
     mVar.define(varName, [], input(inpel));
   }
   return mVar;
 }
 
+let variableText = {};
+let variable = {};
+function varFromText(module, text) {
+  let [_, varName, func] = /\s*(\$\w*)\s*=\s*(\S[\S\s]*)/.exec(text);
+  if(variable[varName]===undefined) {
+    variable[varName] = createVar(module, varName, func);
+  } else {
+    let vv = varName.substr(1);
+    $(`#var_${vv}`).remove();
+    let n = createVar(module, varName, func);
+    variable[varName].delete();
+    variable[varName] = n;
+  }
+  variableText[varName] = text;
+  return variable[varName];
+}
+$(function () {
+Split(['#left','#right'], {sizes: [25,75], gutterSize: 6});
+Split(['#canvas','#editor'], {
+sizes: [60,35],  direction: 'vertical', gutterSize:6});
 let runtime = new Runtime();
 const module = runtime.module();
-
+let editor = ace.edit("editor");
+editor.setOptions({
+  useWorker: false,
+	autoScrollEditorIntoView: true,
+  copyWithEmptySelection: true
+});
+let JavaScriptMode = ace.require("ace/mode/javascript").Mode;
+editor.session.setMode(new JavaScriptMode());
 varFromText(module, `$volume = range([0,100],{step:1})`);
 varFromText(module, `$test = { return $volume + 1; } `);
-
+varFromText(module, `$test = { return $volume + 2; } `);
+});
 </script>
 </html>

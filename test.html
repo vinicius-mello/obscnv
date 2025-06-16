@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <title>Teste</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="./css/test.css">
+</head>
+<body>
+	<div id="all">
+		<div id="left">
+		</div>
+		<div id="right">
+		<div id="canvas"></div>
+		<div id="editor"></div>
+		<div id="console"></div>
+		</div>
+	</div>
+</body>
+<script type="importmap">
+	{
+		"imports": {
+			"isoformat": "./modules/isoformat/index.js",
+			"htl": "./modules/htl/index.js",
+			"runtime": "./modules/runtime/index.js",
+			"inspector": "./modules/inspector/index.js",
+			"inputs": "./modules/inputs/index.js",
+			"split": "./modules/split/split.js"
+		}
+	}
+</script>
+<script type="module">
+
+import Split from 'split';
+
+Split(['#left','#right'], {sizes: [25,75], gutterSize: 6});
+Split(['#canvas','#editor'], {
+sizes: [60,35],  direction: 'vertical', gutterSize:6});
+</script>
+</html>
